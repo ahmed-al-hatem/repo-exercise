@@ -20,7 +20,10 @@ jobs:
       - name: Restore
         run: dotnet restore BleFinder.sln
       - name: Test
-        run: dotnet test BleFinder.sln -c Release --no-restore
+        shell: pwsh
+        run: |
+          dotnet test BleFinder.sln -c Release --no-restore 2>&1 | Tee-Object -FilePath test-output.txt
+          exit $LASTEXITCODE
       - name: Publish
         if: success()
         shell: pwsh
@@ -45,4 +48,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $state = if ("${{ job.status }}" -eq "success") { "success" } else { "failure" }
-          gh api --method POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state="$state" -f context="codex/windows-ci" -f description="Windows test and publish: ${{ job.status }}"
+          $context = "codex/windows-ci"
+          if ($state -eq "failure" -and (Test-Path test-output.txt)) {
+            $match = Select-String -Path test-output.txt -Pattern "error (CS[0-9]{4})" | Select-Object -First 1
+            if ($match) { $context = "$context/$($match.Matches[0].Groups[1].Value)" }
+          }
+          gh api --method POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state="$state" -f context="$context" -f description="Windows test and publish: ${{ job.status }}"
