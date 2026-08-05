@@ -45,6 +45,15 @@ jobs:
           name: BleFinder-win-x64
           path: artifacts/publish/*.exe
           if-no-files-found: error
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diagnostics-${{ github.run_id }}
+          path: |
+            test-output.txt
+            publish-output.txt
+          if-no-files-found: ignore
       - name: Report commit status
         if: always()
         shell: pwsh
@@ -73,4 +82,5 @@ jobs:
               }
             }
           }
+          $context = "$context/run-${{ github.run_id }}"
           gh api --method POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state="$state" -f context="$context" -f description="Windows test and publish: ${{ job.status }}"
