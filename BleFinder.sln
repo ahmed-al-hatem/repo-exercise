@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BleFinder.Core", "src\BleFi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BleFinder.Core.Tests", "tests\BleFinder.Core.Tests\BleFinder.Core.Tests.csproj", "{D1D9EE9A-D41F-484B-86DC-A90FCF768961}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BleFinder.App", "src\BleFinder.App\BleFinder.App.csproj", "{034B9067-62A3-49AF-9099-9AE6C94D70AE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,6 +22,10 @@ Global
 		{D1D9EE9A-D41F-484B-86DC-A90FCF768961}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D1D9EE9A-D41F-484B-86DC-A90FCF768961}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D1D9EE9A-D41F-484B-86DC-A90FCF768961}.Release|Any CPU.Build.0 = Release|Any CPU
+		{034B9067-62A3-49AF-9099-9AE6C94D70AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{034B9067-62A3-49AF-9099-9AE6C94D70AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{034B9067-62A3-49AF-9099-9AE6C94D70AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{034B9067-62A3-49AF-9099-9AE6C94D70AE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
