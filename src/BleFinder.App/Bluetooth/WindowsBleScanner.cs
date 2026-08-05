@@ -9,9 +9,12 @@ namespace BleFinder.App.Bluetooth;
 public sealed class WindowsBleScanner : IBleScanner
 {
     private readonly object _gate = new();
+    // State mutation and enqueue share _gate; the single drainer preserves that FIFO order.
+    private readonly Queue<ScannerStateChanged> _stateNotifications = new();
     private BluetoothLEAdvertisementWatcher? _watcher;
     private ScannerState _state = ScannerState.Stopped;
     private int _generation;
+    private bool _isDrainingStateNotifications;
     private bool _disposed;
 
     public event EventHandler<BleObservation>? ObservationReceived;
@@ -32,7 +35,6 @@ public sealed class WindowsBleScanner : IBleScanner
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         int generation;
-        ScannerStateChanged? starting;
 
         lock (_gate)
         {
@@ -44,10 +46,10 @@ public sealed class WindowsBleScanner : IBleScanner
             }
 
             generation = ++_generation;
-            starting = SetStateLocked(ScannerState.Starting);
+            QueueStateLocked(ScannerState.Starting);
         }
 
-        RaiseStateChanged(starting);
+        DrainStateNotifications();
 
         try
         {
@@ -88,7 +90,6 @@ public sealed class WindowsBleScanner : IBleScanner
             watcher.Received += OnWatcherReceived;
             watcher.Stopped += OnWatcherStopped;
 
-            ScannerStateChanged? completed;
             lock (_gate)
             {
                 if (_disposed || generation != _generation)
@@ -117,10 +118,10 @@ public sealed class WindowsBleScanner : IBleScanner
                     Detach(watcher);
                 }
 
-                completed = SetStateLocked(state);
+                QueueStateLocked(state);
             }
 
-            RaiseStateChanged(completed);
+            DrainStateNotifications();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -136,7 +137,6 @@ public sealed class WindowsBleScanner : IBleScanner
     {
         BluetoothLEAdvertisementWatcher? watcher;
         int generation;
-        ScannerStateChanged? stopped;
 
         lock (_gate)
         {
@@ -154,10 +154,10 @@ public sealed class WindowsBleScanner : IBleScanner
                 Detach(watcher);
             }
 
-            stopped = SetStateLocked(ScannerState.Stopped);
+            QueueStateLocked(ScannerState.Stopped);
         }
 
-        RaiseStateChanged(stopped);
+        DrainStateNotifications();
 
         if (watcher is null)
         {
@@ -189,7 +189,7 @@ public sealed class WindowsBleScanner : IBleScanner
             ++_generation;
             watcher = _watcher;
             _watcher = null;
-            _state = ScannerState.Stopped;
+            QueueStateLocked(ScannerState.Stopped);
 
             if (watcher is not null)
             {
@@ -197,19 +197,19 @@ public sealed class WindowsBleScanner : IBleScanner
             }
         }
 
-        if (watcher is null)
+        if (watcher is not null)
         {
-            return;
+            try
+            {
+                watcher.Stop();
+            }
+            catch
+            {
+                // Disposal is best-effort and must remain safe during application shutdown.
+            }
         }
 
-        try
-        {
-            watcher.Stop();
-        }
-        catch
-        {
-            // Disposal is best-effort and must remain safe during application shutdown.
-        }
+        DrainStateNotifications();
     }
 
     private void OnWatcherReceived(
@@ -239,8 +239,6 @@ public sealed class WindowsBleScanner : IBleScanner
         BluetoothLEAdvertisementWatcher sender,
         BluetoothLEAdvertisementWatcherStoppedEventArgs args)
     {
-        ScannerStateChanged? change;
-
         lock (_gate)
         {
             if (_disposed || !ReferenceEquals(sender, _watcher))
@@ -252,10 +250,10 @@ public sealed class WindowsBleScanner : IBleScanner
             Detach(sender);
 
             var state = MapStopError(args.Error, sender.Status);
-            change = SetStateLocked(state, args.Error == BluetoothError.Success ? null : args.Error.ToString());
+            QueueStateLocked(state, args.Error == BluetoothError.Success ? null : args.Error.ToString());
         }
 
-        RaiseStateChanged(change);
+        DrainStateNotifications();
     }
 
     private bool IsCurrent(int generation)
@@ -268,8 +266,6 @@ public sealed class WindowsBleScanner : IBleScanner
 
     private void CompleteStart(int generation, ScannerState state, string? errorCode = null)
     {
-        ScannerStateChanged? change;
-
         lock (_gate)
         {
             if (_disposed || generation != _generation)
@@ -277,28 +273,65 @@ public sealed class WindowsBleScanner : IBleScanner
                 return;
             }
 
-            change = SetStateLocked(state, errorCode);
+            QueueStateLocked(state, errorCode);
         }
 
-        RaiseStateChanged(change);
+        DrainStateNotifications();
     }
 
-    private ScannerStateChanged? SetStateLocked(ScannerState state, string? errorCode = null)
+    private void QueueStateLocked(ScannerState state, string? errorCode = null)
     {
         if (_state == state && errorCode is null)
         {
-            return null;
+            return;
         }
 
         _state = state;
-        return new ScannerStateChanged(state, errorCode);
+        _stateNotifications.Enqueue(new ScannerStateChanged(state, errorCode));
     }
 
-    private void RaiseStateChanged(ScannerStateChanged? change)
+    private void DrainStateNotifications()
     {
-        if (change is not null)
+        lock (_gate)
         {
-            StateChanged?.Invoke(this, change);
+            if (_isDrainingStateNotifications || _stateNotifications.Count == 0)
+            {
+                return;
+            }
+
+            _isDrainingStateNotifications = true;
+        }
+
+        Exception? firstException = null;
+
+        while (true)
+        {
+            ScannerStateChanged change;
+
+            lock (_gate)
+            {
+                if (_stateNotifications.Count == 0)
+                {
+                    _isDrainingStateNotifications = false;
+                    break;
+                }
+
+                change = _stateNotifications.Dequeue();
+            }
+
+            try
+            {
+                StateChanged?.Invoke(this, change);
+            }
+            catch (Exception exception)
+            {
+                firstException ??= exception;
+            }
+        }
+
+        if (firstException is not null)
+        {
+            throw firstException;
         }
     }
 
