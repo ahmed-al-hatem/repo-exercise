@@ -157,21 +157,19 @@ public sealed class WindowsBleScanner : IBleScanner
             QueueStateLocked(ScannerState.Stopped);
         }
 
+        if (watcher is not null)
+        {
+            try
+            {
+                watcher.Stop();
+            }
+            catch (Exception exception)
+            {
+                CompleteStart(generation, ScannerState.Aborted, ErrorCode(exception));
+            }
+        }
+
         DrainStateNotifications();
-
-        if (watcher is null)
-        {
-            return;
-        }
-
-        try
-        {
-            watcher.Stop();
-        }
-        catch (Exception exception)
-        {
-            CompleteStart(generation, ScannerState.Aborted, ErrorCode(exception));
-        }
     }
 
     public void Dispose()
