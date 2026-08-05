@@ -8,7 +8,28 @@
         MinWidth="860"
         MinHeight="580"
         FlowDirection="RightToLeft"
-        Language="ar">
+        Language="ar"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style x:Key="SectionBorder" TargetType="Border">
+            <Setter Property="Background"
+                    Value="{DynamicResource {x:Static SystemColors.ControlBrushKey}}" />
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="18" />
+        </Style>
+        <Style x:Key="SecondaryText" TargetType="TextBlock">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+        </Style>
+        <Style x:Key="LeftToRightText" TargetType="TextBlock">
+            <Setter Property="FlowDirection" Value="LeftToRight" />
+            <Setter Property="TextAlignment" Value="Left" />
+        </Style>
+    </Window.Resources>
+
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -20,41 +41,73 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel>
-                <TextBlock FontSize="28" FontWeight="SemiBold" Text="محدد أجهزة BLE" />
-                <TextBlock Text="{Binding StatusText}" />
-            </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Command="{Binding StartCommand}" Content="بدء المسح" />
-                <Button Command="{Binding StopCommand}" Content="إيقاف المسح" />
-            </StackPanel>
-        </Grid>
 
-        <Grid Grid.Row="1" Margin="0,24,0,0">
-            <Grid.Style>
-                <Style TargetType="Grid">
-                    <Setter Property="Visibility" Value="Visible" />
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding Tracking}" Value="{x:Null}">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Grid.Style>
-            <StackPanel DataContext="{Binding Tracking}">
-                <Button HorizontalAlignment="Right"
-                        Command="{Binding DataContext.BackCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                        Content="رجوع" />
-                <TextBlock Text="{Binding Name}" />
-                <TextBlock FlowDirection="LeftToRight" Text="{Binding AddressText}" />
-                <TextBlock Text="{Binding RssiText}" />
-                <TextBlock Text="{Binding BandLabel}" />
-                <TextBlock Text="{Binding TrendText}" />
-                <TextBlock Text="{Binding Freshness}" />
-                <CheckBox Content="الصوت"
-                          IsChecked="{Binding SoundEnabled, Mode=TwoWay}" />
-                <controls:SignalHistoryControl Samples="{Binding History}" />
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock FontSize="28"
+                           FontWeight="SemiBold"
+                           Text="محدد أجهزة BLE" />
+                <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                    <Ellipse Width="10"
+                             Height="10"
+                             Margin="0,0,0,0"
+                             VerticalAlignment="Center"
+                             AutomationProperties.Name="حالة المسح">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="#FFF59E0B" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsScanning}" Value="True">
+                                        <Setter Property="Fill" Value="#FF22C55E" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               AutomationProperties.LiveSetting="Polite"
+                               Text="{Binding StatusText}" />
+                </StackPanel>
+                <TextBlock Margin="18,3,0,0"
+                           FlowDirection="LeftToRight"
+                           Style="{StaticResource SecondaryText}"
+                           Text="{Binding ScannerErrorCode}" />
             </StackPanel>
+
+            <Grid Grid.Column="1" VerticalAlignment="Center">
+                <Button MinWidth="120"
+                        Padding="14,8"
+                        AutomationProperties.Name="بدء مسح أجهزة Bluetooth منخفض الطاقة"
+                        Command="{Binding StartCommand}"
+                        Content="بدء المسح">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsScanning}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button MinWidth="120"
+                        Padding="14,8"
+                        AutomationProperties.Name="إيقاف مسح أجهزة Bluetooth منخفض الطاقة"
+                        Command="{Binding StopCommand}"
+                        Content="إيقاف المسح">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsScanning}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
         </Grid>
 
         <Grid Grid.Row="1" Margin="0,24,0,0">
@@ -72,44 +125,277 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="ابحث بالاسم أو العنوان" />
-                <TextBlock Grid.Column="1" Text="{Binding DeviceCountText}" />
-                <CheckBox Grid.Column="2"
-                          Content="إخفاء العناوين"
-                          IsChecked="{Binding HideAddresses, Mode=TwoWay}" />
+
+            <Border Grid.Row="0" Style="{StaticResource SectionBorder}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="ابحث بالاسم أو العنوان" />
+                        <TextBox Margin="0,7,0,0"
+                                 MinWidth="320"
+                                 Padding="10,7"
+                                 FlowDirection="LeftToRight"
+                                 AutomationProperties.Name="ابحث بالاسم أو العنوان"
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1"
+                               Margin="20,0"
+                               VerticalAlignment="Center"
+                               AutomationProperties.LiveSetting="Polite"
+                               Text="{Binding DeviceCountText}" />
+                    <CheckBox Grid.Column="2"
+                              VerticalAlignment="Center"
+                              AutomationProperties.Name="إخفاء عناوين Bluetooth"
+                              Content="إخفاء العناوين"
+                              IsChecked="{Binding HideAddresses, Mode=TwoWay}" />
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" Margin="0,14,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="DeviceList" ItemsSource="{Binding Devices}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,10"
+                                        Padding="6"
+                                        Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}"
+                                        BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
+                                        BorderThickness="1"
+                                        CornerRadius="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Button Grid.Column="0"
+                                                Padding="12"
+                                                HorizontalContentAlignment="Stretch"
+                                                AutomationProperties.Name="{Binding Name}"
+                                                AutomationProperties.HelpText="اختيار الجهاز وتتبع قوة إشارته"
+                                                Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding Address}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="2*" />
+                                                    <ColumnDefinition Width="1.1*" />
+                                                    <ColumnDefinition Width="1.1*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock FontSize="17"
+                                                               FontWeight="SemiBold"
+                                                               Text="{Binding Name}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Margin="0,5,0,0"
+                                                               Style="{StaticResource LeftToRightText}"
+                                                               Text="{Binding AddressText}" />
+                                                    <TextBlock Margin="0,5,0,0"
+                                                               Style="{StaticResource SecondaryText}"
+                                                               Text="{Binding MetadataText}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Margin="18,0" VerticalAlignment="Center">
+                                                    <TextBlock HorizontalAlignment="Center"
+                                                               FontSize="18"
+                                                               FontWeight="SemiBold"
+                                                               Style="{StaticResource LeftToRightText}"
+                                                               Text="{Binding RssiText}" />
+                                                    <ProgressBar Height="8"
+                                                                 Margin="0,8,0,0"
+                                                                 FlowDirection="LeftToRight"
+                                                                 Maximum="100"
+                                                                 Value="{Binding StrengthPercent}" />
+                                                    <TextBlock Margin="0,6,0,0"
+                                                               HorizontalAlignment="Center"
+                                                               Text="{Binding BandLabel}" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                    <TextBlock HorizontalAlignment="Center"
+                                                               Text="{Binding Freshness}" />
+                                                    <TextBlock Margin="0,6,0,0"
+                                                               HorizontalAlignment="Center"
+                                                               Style="{StaticResource SecondaryText}"
+                                                               Text="{Binding LastSeenText}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+
+                                        <Button Grid.Column="1"
+                                                Margin="10,0,0,0"
+                                                Padding="12,8"
+                                                VerticalAlignment="Center"
+                                                AutomationProperties.Name="نسخ عنوان Bluetooth الكامل"
+                                                Command="{Binding DataContext.CopyAddressCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding Address}"
+                                                Content="نسخ العنوان" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <TextBlock Padding="24"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontSize="18"
+                           Text="لم يظهر أي جهاز بعد — اترك المسح يعمل لبضع ثوانٍ"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ElementName=DeviceList, Path=Items.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </Grid>
-            <ItemsControl Grid.Row="1" ItemsSource="{Binding Devices}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Grid>
-                            <Button Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    CommandParameter="{Binding Address}">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Name}" />
-                                    <TextBlock FlowDirection="LeftToRight" Text="{Binding AddressText}" />
-                                    <TextBlock Text="{Binding RssiText}" />
-                                    <ProgressBar Maximum="100" Value="{Binding StrengthPercent}" />
-                                    <TextBlock Text="{Binding BandLabel}" />
-                                    <TextBlock Text="{Binding Freshness}" />
-                                    <TextBlock Text="{Binding LastSeenText}" />
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,24,0,0">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Tracking}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel DataContext="{Binding Tracking}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                                Padding="14,8"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="العودة إلى قائمة الأجهزة"
+                                Command="{Binding DataContext.BackCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                Content="رجوع" />
+                        <StackPanel Grid.Column="1" Margin="20,0">
+                            <TextBlock FontSize="24"
+                                       FontWeight="SemiBold"
+                                       Text="{Binding Name}"
+                                       TextAlignment="Center" />
+                            <TextBlock Margin="0,5,0,0"
+                                       HorizontalAlignment="Center"
+                                       Style="{StaticResource LeftToRightText}"
+                                       Text="{Binding AddressText}" />
+                        </StackPanel>
+                        <CheckBox Grid.Column="2"
+                                  VerticalAlignment="Center"
+                                  AutomationProperties.Name="تفعيل النقرات حسب قرب الجهاز"
+                                  Content="صوت القرب"
+                                  IsChecked="{Binding SoundEnabled, Mode=TwoWay}" />
+                    </Grid>
+
+                    <Grid Margin="0,18,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.2*" />
+                            <ColumnDefinition Width="2*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Margin="0,0,0,0" Style="{StaticResource SectionBorder}">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock FontSize="54"
+                                           FontWeight="Bold"
+                                           Style="{StaticResource LeftToRightText}"
+                                           Text="{Binding RssiText}"
+                                           TextAlignment="Center" />
+                                <TextBlock Margin="0,6,0,0"
+                                           HorizontalAlignment="Center"
+                                           FontSize="20"
+                                           Text="{Binding BandLabel}" />
+                                <StackPanel Margin="0,12,0,0" HorizontalAlignment="Center" Orientation="Horizontal">
+                                    <TextBlock FontSize="26" Text="{Binding TrendArrow}" />
+                                    <TextBlock Margin="8,0,0,0"
+                                               FontSize="18"
+                                               Text="{Binding TrendText}" />
                                 </StackPanel>
-                            </Button>
-                            <Button HorizontalAlignment="Left"
-                                    VerticalAlignment="Center"
-                                    Command="{Binding DataContext.CopyAddressCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    CommandParameter="{Binding Address}"
-                                    Content="نسخ العنوان" />
+                                <TextBlock Margin="0,12,0,0"
+                                           HorizontalAlignment="Center"
+                                           FontWeight="SemiBold"
+                                           AutomationProperties.LiveSetting="Polite"
+                                           Text="{Binding Freshness}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="1" Margin="14,0,0,0" Style="{StaticResource SectionBorder}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock FontSize="17"
+                                           FontWeight="SemiBold"
+                                           Text="سجل الإشارة خلال 60 ثانية" />
+                                <controls:SignalHistoryControl Grid.Row="1"
+                                                               MinHeight="220"
+                                                               Margin="0,12,0,0"
+                                                               AutomationProperties.Name="مخطط سجل قوة الإشارة"
+                                                               Samples="{Binding History}" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <Border Margin="0,14,0,0" Style="{StaticResource SectionBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="2*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Style="{StaticResource SecondaryText}" Text="أعلى إشارة في الجلسة" />
+                                <TextBlock Margin="0,5,0,0"
+                                           FontSize="17"
+                                           Style="{StaticResource LeftToRightText}"
+                                           Text="{Binding PeakText}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="18,0">
+                                <TextBlock Style="{StaticResource SecondaryText}" Text="آخر ظهور" />
+                                <TextBlock Margin="0,5,0,0" Text="{Binding LastSeenText}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource SecondaryText}" Text="بيانات الإعلان" />
+                                <TextBlock Margin="0,5,0,0"
+                                           FlowDirection="LeftToRight"
+                                           Text="{Binding ManufacturerText}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Margin="0,4,0,0"
+                                           FlowDirection="LeftToRight"
+                                           Text="{Binding ServicesText}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
                         </Grid>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                    </Border>
+
+                    <Border Margin="0,14,0,0"
+                            Padding="14"
+                            Background="#20F59E0B"
+                            BorderBrush="#FFF59E0B"
+                            BorderThickness="1"
+                            CornerRadius="9">
+                        <TextBlock Text="الإشارة تقديرية وتتأثر بالجدران والمعادن واتجاه الجهاز. راقب الاتجاه أثناء الحركة، لا قراءة واحدة."
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap" />
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </Grid>
 </Window>
