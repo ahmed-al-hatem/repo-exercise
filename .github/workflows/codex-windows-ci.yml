@@ -5,6 +5,10 @@ on:
     branches: ["codex/ble-finder-windows"]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  statuses: write
+
 jobs:
   test-and-publish:
     runs-on: windows-latest
@@ -34,3 +38,11 @@ jobs:
           name: BleFinder-win-x64
           path: artifacts/publish/*.exe
           if-no-files-found: error
+      - name: Report commit status
+        if: always()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $state = if ("${{ job.status }}" -eq "success") { "success" } else { "failure" }
+          gh api --method POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state="$state" -f context="codex/windows-ci" -f description="Windows test and publish: ${{ job.status }}"
