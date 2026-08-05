@@ -1,0 +1,36 @@
+name: Codex Windows CI
+
+on:
+  push:
+    branches: ["codex/ble-finder-windows"]
+  workflow_dispatch:
+
+jobs:
+  test-and-publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore BleFinder.sln
+      - name: Test
+        run: dotnet test BleFinder.sln -c Release --no-restore
+      - name: Publish
+        if: success()
+        shell: pwsh
+        run: |
+          dotnet publish src/BleFinder.App/BleFinder.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -p:DebugType=None -o artifacts/publish
+          $files = Get-ChildItem artifacts/publish -File
+          $exe = @($files | Where-Object Extension -eq ".exe")
+          $dll = @($files | Where-Object Extension -eq ".dll")
+          if ($exe.Count -ne 1) { throw "Expected exactly one EXE, found $($exe.Count)" }
+          if ($dll.Count -ne 0) { throw "Expected no DLLs, found $($dll.Count)" }
+      - name: Upload executable
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: BleFinder-win-x64
+          path: artifacts/publish/*.exe
+          if-no-files-found: error
