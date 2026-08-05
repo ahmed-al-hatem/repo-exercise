@@ -1,0 +1,74 @@
+name: Build Windows portable app
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  pull_request:
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  windows-ci:
+    name: Restore, test, and publish
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore BleFinder.sln
+
+      - name: Test
+        run: dotnet test BleFinder.sln -c Release --no-restore
+
+      - name: Publish portable executable
+        shell: pwsh
+        run: ./scripts/publish.ps1
+
+      - name: Upload portable executable
+        uses: actions/upload-artifact@v7
+        with:
+          name: BleFinder-win-x64
+          path: artifacts/BleFinder-win-x64/**
+          if-no-files-found: error
+
+      - name: Report run status
+        if: ${{ always() }}
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATUS_SHA: ${{ github.sha }}
+          STATUS_CONTEXT: ble-finder/windows-ci/run-${{ github.run_id }}
+          STATUS_TARGET: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          $state = switch ($env:JOB_STATUS) {
+            "success" { "success" }
+            "cancelled" { "error" }
+            default { "failure" }
+          }
+
+          gh api `
+            --method POST `
+            "repos/${{ github.repository }}/statuses/$env:STATUS_SHA" `
+            --raw-field "state=$state" `
+            --raw-field "context=$env:STATUS_CONTEXT" `
+            --raw-field "description=Windows CI: $env:JOB_STATUS" `
+            --raw-field "target_url=$env:STATUS_TARGET"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not publish commit status (exit code $LASTEXITCODE)."
+          }
