@@ -72,6 +72,22 @@
                            FlowDirection="LeftToRight"
                            Style="{StaticResource SecondaryText}"
                            Text="{Binding ScannerErrorCode}" />
+                <TextBlock Margin="18,5,0,0"
+                           MaxWidth="620"
+                           AutomationProperties.LiveSetting="Polite"
+                           Text="{Binding StatusGuidanceText}"
+                           TextWrapping="Wrap">
+                    <TextBlock.Style>
+                        <Style BasedOn="{StaticResource SecondaryText}" TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding StatusGuidanceText}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </StackPanel>
 
             <Grid Grid.Column="1" VerticalAlignment="Center">

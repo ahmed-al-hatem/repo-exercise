@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using BleFinder.Core.Audio;
 using BleFinder.Core.Devices;
 using BleFinder.Core.Models;
@@ -14,13 +15,16 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly IProximitySound _sound;
     private readonly IClipboardService _clipboard;
     private readonly IClock _clock;
+    private readonly object _pendingScannerStateGate = new();
+    private readonly Dictionary<ulong, DeviceRowViewModel> _deviceRows = [];
     private IReadOnlyList<DeviceSnapshot> _currentSnapshots = [];
-    private IReadOnlyList<DeviceRowViewModel> _devices = [];
+    private ScannerStateChanged? _pendingScannerState;
     private TrackingViewModel? _tracking;
     private DeviceSnapshot? _lastSelectedSnapshot;
     private ulong? _selectedAddress;
     private string _searchText = string.Empty;
     private string _statusText;
+    private string _statusGuidanceText;
     private string _deviceCountText = "0 أجهزة";
     private string? _scannerErrorCode;
     private bool _isScanning;
@@ -47,6 +51,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _clipboard = clipboard;
         _clock = clock;
         _statusText = StatusFor(scanner.State);
+        _statusGuidanceText = GuidanceFor(scanner.State);
         _isScanning = scanner.State is ScannerState.Starting or ScannerState.Scanning;
 
         StartCommand = new AsyncRelayCommand(StartAsync);
@@ -54,6 +59,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         SelectCommand = new RelayCommand(Select);
         CopyAddressCommand = new RelayCommand(CopyAddress);
         BackCommand = new RelayCommand(Back);
+
+        Devices = new ObservableCollection<DeviceRowViewModel>();
 
         _scanner.ObservationReceived += OnObservationReceived;
         _scanner.StateChanged += OnScannerStateChanged;
@@ -69,11 +76,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public RelayCommand BackCommand { get; }
 
-    public IReadOnlyList<DeviceRowViewModel> Devices
-    {
-        get => _devices;
-        private set => SetProperty(ref _devices, value);
-    }
+    public ObservableCollection<DeviceRowViewModel> Devices { get; }
 
     public TrackingViewModel? Tracking
     {
@@ -138,6 +141,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         private set => SetProperty(ref _statusText, value);
     }
 
+    public string StatusGuidanceText
+    {
+        get => _statusGuidanceText;
+        private set => SetProperty(ref _statusGuidanceText, value);
+    }
+
     public string DeviceCountText
     {
         get => _deviceCountText;
@@ -165,7 +174,6 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         try
         {
             await _scanner.StartAsync();
-            ApplyScannerState(_scanner.State, null);
         }
         finally
         {
@@ -177,19 +185,20 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public void Refresh()
     {
         ThrowIfDisposed();
+        ApplyPendingScannerState();
 
         var now = _clock.Now;
         _currentSnapshots = _registry.Snapshot(now);
 
-        var visibleSnapshots = string.IsNullOrWhiteSpace(SearchText)
+        SynchronizeDeviceRows(_currentSnapshots, now);
+
+        IReadOnlyList<DeviceSnapshot> visibleSnapshots = string.IsNullOrWhiteSpace(SearchText)
             ? _currentSnapshots
             : _currentSnapshots
                 .Where(snapshot => AddressFormatter.Matches(snapshot.Address, snapshot.LocalName, SearchText))
                 .ToArray();
 
-        Devices = visibleSnapshots
-            .Select(snapshot => new DeviceRowViewModel(snapshot, now, HideAddresses))
-            .ToArray();
+        SynchronizeVisibleDevices(visibleSnapshots);
         DeviceCountText = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{Devices.Count} أجهزة");
 
         UpdateTracking(now);
@@ -213,14 +222,20 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private void OnObservationReceived(object? sender, BleObservation observation) =>
         _registry.Record(observation);
 
-    private void OnScannerStateChanged(object? sender, ScannerStateChanged change) =>
-        ApplyScannerState(change.State, change.ErrorCode);
+    private void OnScannerStateChanged(object? sender, ScannerStateChanged change)
+    {
+        lock (_pendingScannerStateGate)
+        {
+            _pendingScannerState = change;
+        }
+    }
 
     private void ApplyScannerState(ScannerState state, string? errorCode)
     {
         IsScanning = state is ScannerState.Starting or ScannerState.Scanning;
         ScannerErrorCode = errorCode;
         StatusText = StatusFor(state);
+        StatusGuidanceText = GuidanceFor(state);
     }
 
     private void Stop()
@@ -231,7 +246,71 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
 
         _scanner.Stop();
-        ApplyScannerState(_scanner.State, null);
+    }
+
+    private void ApplyPendingScannerState()
+    {
+        ScannerStateChanged? change;
+
+        lock (_pendingScannerStateGate)
+        {
+            change = _pendingScannerState;
+            _pendingScannerState = null;
+        }
+
+        if (change is not null)
+        {
+            ApplyScannerState(change.State, change.ErrorCode);
+        }
+    }
+
+    private void SynchronizeDeviceRows(IReadOnlyList<DeviceSnapshot> snapshots, DateTimeOffset now)
+    {
+        var currentAddresses = snapshots.Select(snapshot => snapshot.Address).ToHashSet();
+
+        foreach (var removedAddress in _deviceRows.Keys.Where(address => !currentAddresses.Contains(address)).ToArray())
+        {
+            _deviceRows.Remove(removedAddress);
+        }
+
+        foreach (var snapshot in snapshots)
+        {
+            if (_deviceRows.TryGetValue(snapshot.Address, out var row))
+            {
+                row.Update(snapshot, now, HideAddresses);
+            }
+            else
+            {
+                _deviceRows.Add(snapshot.Address, new DeviceRowViewModel(snapshot, now, HideAddresses));
+            }
+        }
+    }
+
+    private void SynchronizeVisibleDevices(IReadOnlyList<DeviceSnapshot> visibleSnapshots)
+    {
+        for (var targetIndex = 0; targetIndex < visibleSnapshots.Count; targetIndex++)
+        {
+            var row = _deviceRows[visibleSnapshots[targetIndex].Address];
+            if (targetIndex < Devices.Count && ReferenceEquals(Devices[targetIndex], row))
+            {
+                continue;
+            }
+
+            var currentIndex = Devices.IndexOf(row);
+            if (currentIndex >= 0)
+            {
+                Devices.Move(currentIndex, targetIndex);
+            }
+            else
+            {
+                Devices.Insert(targetIndex, row);
+            }
+        }
+
+        while (Devices.Count > visibleSnapshots.Count)
+        {
+            Devices.RemoveAt(Devices.Count - 1);
+        }
     }
 
     private void Select(object? parameter)
@@ -314,5 +393,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         ScannerState.BluetoothOff => "Bluetooth متوقف",
         ScannerState.AdapterMissing => "لا يوجد محول BLE",
         _ => "توقف المسح",
+    };
+
+    private static string GuidanceFor(ScannerState state) => state switch
+    {
+        ScannerState.BluetoothOff => "شغّل Bluetooth من إعدادات Windows ثم أعد المحاولة.",
+        ScannerState.AdapterMissing => "يلزم محول Bluetooth LE لاكتشاف الأجهزة.",
+        ScannerState.Aborted => "فشل المسح. أعد المحاولة من زر بدء المسح.",
+        _ => string.Empty,
     };
 }
