@@ -46,7 +46,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         _sound = sound;
         _clipboard = clipboard;
         _clock = clock;
-        _statusText = StatusFor(scanner.State, null);
+        _statusText = StatusFor(scanner.State);
         _isScanning = scanner.State is ScannerState.Starting or ScannerState.Scanning;
 
         StartCommand = new AsyncRelayCommand(StartAsync);
@@ -220,7 +220,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         IsScanning = state is ScannerState.Starting or ScannerState.Scanning;
         ScannerErrorCode = errorCode;
-        StatusText = StatusFor(state, errorCode);
+        StatusText = StatusFor(state);
     }
 
     private void Stop()
@@ -308,12 +308,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    private static string StatusFor(ScannerState state, string? errorCode) => state switch
+    private static string StatusFor(ScannerState state) => state switch
     {
         ScannerState.Starting or ScannerState.Scanning => "جارٍ البحث…",
         ScannerState.BluetoothOff => "Bluetooth متوقف",
         ScannerState.AdapterMissing => "لا يوجد محول BLE",
-        ScannerState.Aborted when !string.IsNullOrWhiteSpace(errorCode) => $"توقف المسح ({errorCode})",
         _ => "توقف المسح",
     };
 }

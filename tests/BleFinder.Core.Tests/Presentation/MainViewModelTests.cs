@@ -60,6 +60,16 @@ public sealed class MainViewModelTests
         Assert.Equal("AA:BB:CC:DD:EE:FF", fixture.Clipboard.LastText);
     }
 
+    [Fact]
+    public void AbortedStateKeepsRequiredStatusTextAndExposesErrorCodeSeparately()
+    {
+        var fixture = new ViewModelFixture();
+        fixture.Scanner.Abort("E_PLATFORM");
+
+        Assert.Equal("توقف المسح", fixture.ViewModel.StatusText);
+        Assert.Equal("E_PLATFORM", fixture.ViewModel.ScannerErrorCode);
+    }
+
     private sealed class ViewModelFixture
     {
         public ViewModelFixture()
@@ -129,12 +139,15 @@ public sealed class MainViewModelTests
         public void Emit(BleObservation observation) =>
             ObservationReceived?.Invoke(this, observation);
 
+        public void Abort(string errorCode) =>
+            ChangeState(ScannerState.Aborted, errorCode);
+
         public void Dispose() => DisposeCount++;
 
-        private void ChangeState(ScannerState state)
+        private void ChangeState(ScannerState state, string? errorCode = null)
         {
             State = state;
-            StateChanged?.Invoke(this, new ScannerStateChanged(state));
+            StateChanged?.Invoke(this, new ScannerStateChanged(state, errorCode));
         }
     }
 
