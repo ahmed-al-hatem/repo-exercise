@@ -65,9 +65,54 @@ public sealed class MainViewModelTests
     {
         var fixture = new ViewModelFixture();
         fixture.Scanner.Abort("E_PLATFORM");
+        fixture.ViewModel.Refresh();
 
         Assert.Equal("توقف المسح", fixture.ViewModel.StatusText);
         Assert.Equal("E_PLATFORM", fixture.ViewModel.ScannerErrorCode);
+    }
+
+    [Fact]
+    public void RefreshPreservesCollectionAndRowReferencesWhileUpdatingAndReordering()
+    {
+        var fixture = new ViewModelFixture();
+        fixture.Scanner.Emit(fixture.Observation(1, -80, "Tag"));
+        fixture.Scanner.Emit(fixture.Observation(2, -75, "Keyboard"));
+        fixture.ViewModel.Refresh();
+
+        var devices = fixture.ViewModel.Devices;
+        var tag = Assert.Single(devices, device => device.Address == 1);
+        Assert.Equal([2UL, 1UL], devices.Select(device => device.Address));
+
+        fixture.Clock.Now = fixture.Clock.Now.AddSeconds(1);
+        fixture.Scanner.Emit(fixture.Observation(1, -50, "Tag"));
+        fixture.ViewModel.Refresh();
+
+        Assert.Same(devices, fixture.ViewModel.Devices);
+        Assert.Same(tag, fixture.ViewModel.Devices[0]);
+        Assert.Equal([1UL, 2UL], fixture.ViewModel.Devices.Select(device => device.Address));
+        Assert.Equal("-71 dBm", tag.RssiText);
+        Assert.Equal(45, tag.StrengthPercent);
+    }
+
+    [Fact]
+    public async Task BackgroundScannerStateWaitsForRefreshBeforeMutatingBindableState()
+    {
+        var fixture = new ViewModelFixture();
+        await fixture.ViewModel.StartAsync();
+        fixture.ViewModel.Refresh();
+        Assert.True(fixture.ViewModel.IsScanning);
+
+        await Task.Run(() => fixture.Scanner.Abort("E_BACKGROUND"));
+
+        Assert.True(fixture.ViewModel.IsScanning);
+        Assert.Equal("جارٍ البحث…", fixture.ViewModel.StatusText);
+        Assert.Null(fixture.ViewModel.ScannerErrorCode);
+
+        fixture.ViewModel.Refresh();
+
+        Assert.False(fixture.ViewModel.IsScanning);
+        Assert.Equal("توقف المسح", fixture.ViewModel.StatusText);
+        Assert.Equal("E_BACKGROUND", fixture.ViewModel.ScannerErrorCode);
     }
 
     private sealed class ViewModelFixture
