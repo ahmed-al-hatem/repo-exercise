@@ -102,7 +102,9 @@ public sealed class MainViewModelTests
         fixture.ViewModel.Refresh();
         Assert.True(fixture.ViewModel.IsScanning);
 
-        await Task.Run(() => fixture.Scanner.Abort("E_BACKGROUND"));
+        await Task.Run(
+            () => fixture.Scanner.Abort("E_BACKGROUND"),
+            TestContext.Current.CancellationToken);
 
         Assert.True(fixture.ViewModel.IsScanning);
         Assert.Equal("جارٍ البحث…", fixture.ViewModel.StatusText);
