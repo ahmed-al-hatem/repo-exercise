@@ -87,7 +87,7 @@ dotnet test BleFinder.sln -c Release
 pwsh -File scripts/publish.ps1
 ```
 
-ينشئ الأمر `artifacts/BleFinder-win-x64/BleFinder.exe`، ويتحقق من وجود ملف EXE واحد فقط ومن عدم بقاء ملفات DLL أو PDB، ثم يطبع بصمة SHA-256. إعداد النشر هو `win-x64` ذاتي الاحتواء وملف واحد، مع تعطيل trimming لتوافق WPF وواجهات Windows Runtime.
+ينشئ الأمر `artifacts/BleFinder-win-x64/BleFinder.exe`، ويتحقق من وجود ملف EXE واحد فقط ومن عدم بقاء ملفات DLL أو PDB، ثم يطبع بصمة SHA-256. إعداد النشر هو `win-x64` ذاتي الاحتواء وملف واحد، مع تعطيل trimming لتوافق WPF وواجهات Windows Runtime وتعطيل رموز التصحيح في حزمة التوزيع.
 
 ## الخصوصية والأمان
 

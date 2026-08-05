@@ -42,7 +42,7 @@ try {
     & dotnet publish src/BleFinder.App/BleFinder.App.csproj `
         -c Release -r win-x64 --self-contained true `
         -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
-        -p:PublishTrimmed=false `
+        -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false `
         -o artifacts/BleFinder-win-x64
 
     if ($LASTEXITCODE -ne 0) {
