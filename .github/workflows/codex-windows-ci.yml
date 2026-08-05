@@ -31,7 +31,8 @@ jobs:
         if: success()
         shell: pwsh
         run: |
-          dotnet publish src/BleFinder.App/BleFinder.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -p:DebugType=None -o artifacts/publish
+          dotnet publish src/BleFinder.App/BleFinder.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -p:DebugType=None -o artifacts/publish 2>&1 | Tee-Object -FilePath publish-output.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $files = Get-ChildItem artifacts/publish -File
           $exe = @($files | Where-Object Extension -eq ".exe")
           $dll = @($files | Where-Object Extension -eq ".dll")
@@ -55,8 +56,11 @@ jobs:
           if ("${{ steps.restore.outcome }}" -eq "failure") { $context = "$context/restore" }
           elseif ("${{ steps.test.outcome }}" -eq "failure") { $context = "$context/test" }
           elseif ("${{ steps.publish.outcome }}" -eq "failure") { $context = "$context/publish" }
-          if ($state -eq "failure" -and (Test-Path test-output.txt)) {
-            $match = Select-String -Path test-output.txt -Pattern "error (CS[0-9]{4})" | Select-Object -First 1
-            if ($match) { $context = "$context/$($match.Matches[0].Groups[1].Value)" }
+          if ($state -eq "failure") {
+            $logPath = if (Test-Path test-output.txt) { "test-output.txt" } elseif (Test-Path publish-output.txt) { "publish-output.txt" } else { $null }
+            if ($logPath) {
+              $match = Select-String -Path $logPath -Pattern "error (CS[0-9]{4})" | Select-Object -First 1
+              if ($match) { $context = "$context/$($match.Matches[0].Groups[1].Value)" }
+            }
           }
           gh api --method POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state="$state" -f context="$context" -f description="Windows test and publish: ${{ job.status }}"
