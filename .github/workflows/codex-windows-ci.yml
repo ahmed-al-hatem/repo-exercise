@@ -18,13 +18,16 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Restore
+        id: restore
         run: dotnet restore BleFinder.sln
       - name: Test
+        id: test
         shell: pwsh
         run: |
           dotnet test BleFinder.sln -c Release --no-restore 2>&1 | Tee-Object -FilePath test-output.txt
           exit $LASTEXITCODE
       - name: Publish
+        id: publish
         if: success()
         shell: pwsh
         run: |
@@ -49,6 +52,9 @@ jobs:
         run: |
           $state = if ("${{ job.status }}" -eq "success") { "success" } else { "failure" }
           $context = "codex/windows-ci"
+          if ("${{ steps.restore.outcome }}" -eq "failure") { $context = "$context/restore" }
+          elseif ("${{ steps.test.outcome }}" -eq "failure") { $context = "$context/test" }
+          elseif ("${{ steps.publish.outcome }}" -eq "failure") { $context = "$context/publish" }
           if ($state -eq "failure" -and (Test-Path test-output.txt)) {
             $match = Select-String -Path test-output.txt -Pattern "error (CS[0-9]{4})" | Select-Object -First 1
             if ($match) { $context = "$context/$($match.Matches[0].Groups[1].Value)" }
