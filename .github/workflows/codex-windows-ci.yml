@@ -59,8 +59,10 @@ jobs:
           if ($state -eq "failure") {
             $logPath = if ("${{ steps.publish.outcome }}" -eq "failure" -and (Test-Path publish-output.txt)) { "publish-output.txt" } elseif (Test-Path test-output.txt) { "test-output.txt" } else { $null }
             if ($logPath) {
+              $symbol = Select-String -Path $logPath -Pattern "error CS0246.*name '([^']+)'" | Select-Object -First 1
               $match = Select-String -Path $logPath -Pattern "error (CS[0-9]{4})" | Select-Object -First 1
-              if ($match) { $context = "$context/$($match.Matches[0].Groups[1].Value)" }
+              if ($symbol) { $context = "$context/CS0246/$($symbol.Matches[0].Groups[1].Value)" }
+              elseif ($match) { $context = "$context/$($match.Matches[0].Groups[1].Value)" }
             }
           }
           gh api --method POST "repos/${{ github.repository }}/statuses/${{ github.sha }}" -f state="$state" -f context="$context" -f description="Windows test and publish: ${{ job.status }}"
